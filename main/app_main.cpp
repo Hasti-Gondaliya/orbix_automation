@@ -19,7 +19,6 @@
 #include <common_macros.h>
 #include <app_priv.h>
 #include <app_reset.h>
-#include "plug_state_nvs.h"
 #if CHIP_DEVICE_CONFIG_ENABLE_THREAD
 #include <platform/ESP32/OpenthreadLauncher.h>
 #endif
@@ -86,6 +85,7 @@ static void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
     case chip::DeviceLayer::DeviceEventType::kFabricRemoved: {
         ESP_LOGI(TAG, "Fabric removed successfully");
         if (chip::Server::GetInstance().GetFabricTable().FabricCount() == 0) {
+            app_driver_reset_plug_states();
             chip::CommissioningWindowManager &commissionMgr = chip::Server::GetInstance().GetCommissioningWindowManager();
             constexpr auto kTimeoutSeconds = chip::System::Clock::Seconds16(k_timeout_seconds);
             if (!commissionMgr.IsCommissioningWindowOpen()) {
@@ -180,6 +180,7 @@ static esp_err_t create_plug(gpio_plug* plug, node_t* node)
 
     on_off_plug_in_unit::config_t plugin_unit_config;
     plugin_unit_config.on_off.on_off = false;
+    plugin_unit_config.on_off_lighting.start_up_on_off = nullptr;
     endpoint_t *endpoint = on_off_plug_in_unit::create(node, &plugin_unit_config, ENDPOINT_FLAG_NONE, plug);
 
     if (!endpoint) {
@@ -215,7 +216,6 @@ extern "C" void app_main()
 
     /* Initialize the ESP NVS layer */
     nvs_flash_init();
-    ABORT_APP_ON_FAILURE(plug_state_nvs_init() == ESP_OK, ESP_LOGE(TAG, "Failed to init plug state NVS"));
 
     /* Create a Matter node and add the mandatory Root Node device type on endpoint 0 */
     node::config_t node_config;
@@ -288,14 +288,11 @@ extern "C" void app_main()
     CREATE_PLUG(node, 16)
 #endif
 
-    // Initialize factory reset button and plug control buttons
+    // Initialize factory reset button
     app_driver_handle_t button_handle = app_driver_button_init(&reset_gpio);
     if (button_handle) {
         app_reset_button_register(button_handle);
     }
-
-    err = app_driver_plug_buttons_init();
-    ABORT_APP_ON_FAILURE(err == ESP_OK, ESP_LOGE(TAG, "Failed to initialize plug buttons, err:%d", err));
 
 #if CHIP_DEVICE_CONFIG_ENABLE_THREAD
     /* Set OpenThread platform config */
@@ -313,6 +310,11 @@ extern "C" void app_main()
 
     err = app_driver_restore_plug_states();
     ABORT_APP_ON_FAILURE(err == ESP_OK, ESP_LOGE(TAG, "Failed to restore plug states, err:%d", err));
+
+    /* Init plug buttons after restore so switch settling during boot does not
+     * write spurious OFF states into Matter's esp_matter_kvs namespace. */
+    err = app_driver_plug_buttons_init();
+    ABORT_APP_ON_FAILURE(err == ESP_OK, ESP_LOGE(TAG, "Failed to initialize plug buttons, err:%d", err));
 
 #if CONFIG_ENABLE_CHIP_SHELL
     esp_matter::console::diagnostics_register_commands();

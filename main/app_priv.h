@@ -82,15 +82,22 @@ app_driver_handle_t app_driver_button_init(gpio_num_t * reset_gpio);
  */
 esp_err_t app_driver_plug_buttons_init(void);
 
-/** Restore plug on/off states from NVS.
+/** Restore plug on/off states from Matter NVS and drive relay GPIOs.
  *
- * Call after esp_matter::start() so Matter attributes and relay GPIOs
- * are updated together.
+ * Call after esp_matter::start(). OnOff is NONVOLATILE; esp-matter loads the
+ * saved value from esp_matter_kvs when endpoints are created.
  *
  * @return ESP_OK on success.
  * @return error in case of failure.
  */
 esp_err_t app_driver_restore_plug_states(void);
+
+/** Reset all plugs to off and persist OFF via Matter attributes.
+ *
+ * Use when the device is removed from the network. Factory reset clears
+ * esp_matter_kvs automatically via esp_matter::factory_reset().
+ */
+void app_driver_reset_plug_states(void);
 
 #if CHIP_DEVICE_CONFIG_ENABLE_THREAD
 #define ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG()                                           \

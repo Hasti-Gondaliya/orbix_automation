@@ -21,7 +21,6 @@
 #include <app_priv.h>
 #include <button_gpio.h>
 #include <iot_button.h>
-#include "plug_state_nvs.h"
 
 using namespace chip::app::Clusters;
 using namespace esp_matter;
@@ -71,16 +70,6 @@ esp_err_t app_driver_plugin_unit_init(const gpio_plug* plug)
     return err;
 }
 
-static int get_plug_index(uint16_t endpoint_id)
-{
-    for (int i = 0; i < configure_plugs; i++) {
-        if (plugin_unit_list[i].endpoint_id == endpoint_id) {
-            return i;
-        }
-    }
-    return -1;
-}
-
 // Return GPIO pin from plug-endpoint mapping list
 gpio_num_t get_gpio(uint16_t endpoint_id)
 {
@@ -103,12 +92,6 @@ esp_err_t app_driver_attribute_update(app_driver_handle_t driver_handle, uint16_
             gpio_num_t gpio_pin = get_gpio(endpoint_id);
             if (gpio_pin != GPIO_NUM_NC) {
                 err = app_driver_update_gpio_value(gpio_pin, val->val.b);
-                if (err == ESP_OK) {
-                    int plug_index = get_plug_index(endpoint_id);
-                    if (plug_index >= 0) {
-                        plug_state_nvs_set(plug_index, val->val.b);
-                    }
-                }
             } else {
                 ESP_LOGE(TAG, "GPIO pin mapping for endpoint_id: %d not found", endpoint_id);
                 return ESP_FAIL;
@@ -120,31 +103,52 @@ esp_err_t app_driver_attribute_update(app_driver_handle_t driver_handle, uint16_
 
 esp_err_t app_driver_restore_plug_states(void)
 {
-    esp_err_t err = ESP_OK;
-
     for (int i = 0; i < configure_plugs; i++) {
-        bool on = false;
-        err = plug_state_nvs_get(i, &on);
-        if (err != ESP_OK) {
-            return err;
-        }
+        uint16_t endpoint_id = plugin_unit_list[i].endpoint_id;
+        gpio_num_t gpio_pin = plugin_unit_list[i].plug;
 
-        if (!on) {
+        esp_matter_attr_val_t startup_val = esp_matter_nullable_enum8(nullable<uint8_t>());
+        attribute::update(endpoint_id, OnOff::Id, OnOff::Attributes::StartUpOnOff::Id, &startup_val);
+
+        attribute_t *attr = attribute::get(endpoint_id, OnOff::Id, OnOff::Attributes::OnOff::Id);
+        if (!attr) {
+            ESP_LOGE(TAG, "Failed to get OnOff attribute for plug %d", i + 1);
             continue;
         }
 
-        uint16_t endpoint_id = plugin_unit_list[i].endpoint_id;
-        esp_matter_attr_val_t val = esp_matter_bool(on);
-        err = attribute::update(endpoint_id, OnOff::Id, OnOff::Attributes::OnOff::Id, &val);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to restore plug %d state: %d", i + 1, err);
-            return err;
+        esp_matter_attr_val_t val;
+        esp_err_t get_err = attribute::get_val(attr, &val);
+        if (get_err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to read plug %d OnOff from Matter: %d", i + 1, get_err);
+            continue;
         }
 
-        ESP_LOGI(TAG, "Restored plug %d to ON", i + 1);
+        bool on = val.val.b;
+        if (gpio_pin != GPIO_NUM_NC) {
+            app_driver_update_gpio_value(gpio_pin, on);
+        }
+
+        ESP_LOGI(TAG, "Restored plug %d to %s", i + 1, on ? "ON" : "OFF");
     }
 
+    ESP_LOGI(TAG, "Plug state restore complete");
     return ESP_OK;
+}
+
+void app_driver_reset_plug_states(void)
+{
+    for (int i = 0; i < configure_plugs; i++) {
+        gpio_num_t gpio_pin = plugin_unit_list[i].plug;
+        if (gpio_pin != GPIO_NUM_NC) {
+            app_driver_update_gpio_value(gpio_pin, false);
+        }
+
+        uint16_t endpoint_id = plugin_unit_list[i].endpoint_id;
+        esp_matter_attr_val_t val = esp_matter_bool(false);
+        attribute::update(endpoint_id, OnOff::Id, OnOff::Attributes::OnOff::Id, &val);
+    }
+
+    ESP_LOGI(TAG, "Plug states reset (all off)");
 }
 
 static esp_err_t app_driver_set_plug_state(int plug_index, bool on)
