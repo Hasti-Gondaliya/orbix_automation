@@ -1,76 +1,153 @@
-# Multiple On Off plugin unit
+# Orbix 6-Plug Hub
 
-This example demonstrates the creation of a Multiple On-Off Plugin Unit, where multiple endpoints are mapped to GPIO pins.
+ESP32 Matter firmware for a 6-outlet plug controller with momentary switches and per-device factory QR commissioning.
 
-## Plugin Manager Configuration
-Three default on-off plugin units have been created. You can create similar plugin units.
+Firmware lives in `orbix-6-plug-hub/`. See the [ESP-Matter docs](https://docs.espressif.com/projects/esp-matter/en/latest/esp32/developing.html) for general build and flash instructions.
 
-To update the existing CONFIG_GPIO_PLUG values, follow these steps:
+## GPIO pinout (Orbix ESP32)
 
-1. Open a terminal.
-1. Run the following command to access the configuration menu: 
-`idf.py menuconfig`
-1. Navigate to the "Plugin manager" menu.
-1. Update the GPIO pin number used for the factory reset button and plug output (**Use only available GPIO pins as per the target chip**).
+| Function | GPIO |
+|----------|------|
+| Plug 1 (relay) | 21 |
+| Plug 2 (relay) | 19 |
+| Plug 3 (relay) | 18 |
+| Plug 4 (relay) | 17 |
+| Plug 5 (relay) | 16 |
+| Plug 6 (relay) | 4 |
+| Switch 1 (momentary) | 32 |
+| Switch 2 (momentary) | 33 |
+| Switch 3 (momentary) | 25 |
+| Switch 4 (momentary) | 26 |
+| Switch 5 (momentary) | 27 |
+| Switch 6 (momentary) | 14 |
+| Factory reset button | 34 |
 
-You can update the number of plugin units from same menu.
+Update pins via `idf.py menuconfig` → **Plugin manager**.
 
-The following table defines the default GPIO pin numbers for each supported target device.
+## Flashing with ESP32 DevKit
 
-| IO Function          | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C6 | ESP32-H2 | ESP32-S3 |
-|----------------------|-------|----------|----------|----------|----------|----------|
-| Factory Reset Button | 0     | 9        | 9        | 9        | 9        | 0        |
-| Plug 1               | 2     | 2        | 2        | 2        | 2        | 2        |
-| Plug 2               | 4     | 4        | 4        | 4        | 4        | 4        |
-| Plug 3               | 5     | 5        | 5        | 5        | 5        | 5        |
-| Plug 4               | 12    | 6        | 6        | 12       | 12       | 12       |
-| Plug 5               | 13    | 7        | 7        | 13       | 13       | 13       |
-| Plug 6               | 14    | 8        | 8        | 15       | 14       | 14       |
-| Plug 7               | 15    | 10       | 10       | 18       | 22       | 15       |
-| Plug 8               | 16    | 18       | 18       | 19       | 25       | 16       |
-| Plug 9               | 17    | 0        | 19       | 20       | 26       | 17       |
-| Plug 10              | 18    | 1        | 0        | 21       | 27       | 18       |
-| Plug 11              | 19    | 3        | 1        | 22       | 0        | 19       |
-| Plug 12              | 21    |          | 3        | 23       | 1        | 20       |
-| Plug 13              | 22    |          |          | 0        | 3        | 21       |
-| Plug 14              | 23    |          |          | 1        | 8        | 35       |
-| Plug 15              | 25    |          |          | 3        | 10       | 36       |
-| Plug 16              | 26    |          |          | 6        | 11       | 37       |
+Wire the Orbix PCB to an ESP32 devkit for UART flashing. Connect **PCB → DevKit**:
 
-**Note**: ESP32-C2 and ESP32-C3 do not have enough IO to use all 16 plugs
+| PCB | DevKit |
+|-----|--------|
+| Tx | Tx |
+| Rx | Rx |
+| GND | GND |
+| GPIO0 | GND |
+| 3.3V | 3.3V |
+| EN | RST |
 
-See the [docs](https://docs.espressif.com/projects/esp-matter/en/latest/esp32/developing.html) for more information about building and flashing the firmware.
+**Notes**
 
-## 1. Additional Environment Setup
+- **GPIO0 → GND** puts the ESP32 in download mode so `idf.py flash` and `esptool` can write firmware. Keep this jumper in place while flashing; remove it (or release GPIO0) before normal operation.
+- **EN → RST** lets the devkit reset the PCB during flash.
+- Use the devkit USB serial port when running `idf.py flash` or `flash_factory_device.py`. The flash script auto-detects the port if only one adapter is connected; otherwise pass `-p /dev/ttyACM0` or set `ESPPORT`.
 
-No additional setup is required.
+## Manufacturing: QR codes and factory data
 
-## 2. Post Commissioning Setup
+Each physical unit gets a unique Matter commissioning QR code and matching factory partition (DAC, passcode, discriminator). Device **#N** in manufacturing maps to folder `mfg_qr_codes/fff2_8001/N/`.
 
-No additional setup is required.
+### Prerequisites
 
-## 3. Device Performance
+```bash
+export ESP_MATTER_PATH=/path/to/esp-matter   # parent of connectedhomeip
+source $IDF_PATH/export.sh                   # for esptool when flashing
+```
 
-### 3.1 Memory usage
+Firmware `sdkconfig` must have factory commissioning enabled (already set in this project):
 
-The following is the Memory and Flash Usage.
+- `CONFIG_ENABLE_ESP32_FACTORY_DATA_PROVIDER=y`
+- `CONFIG_CHIP_FACTORY_NAMESPACE_PARTITION_LABEL="fctry"`
+- `CONFIG_DEVICE_VENDOR_ID=0xFFF2` / `CONFIG_DEVICE_PRODUCT_ID=0x8001`
 
--   `Bootup` == Device just finished booting up. Device is not
-    commissionined or connected to wifi yet.
--   `After Commissioning` == Device is connected to wifi and is also
-    commissioned and is rebooted.
--   device used: esp32c3_devkit_m
--   tested on:
-    [6a244a7](https://github.com/espressif/esp-matter/commit/6a244a7b1e5c70b0aa1bf57254f19718b0755d95)
-    (2022-06-16)
+Factory data flashes to the **`fctry`** partition at `0x3E0000`. Plug on/off state stays in the separate **`nvs`** partition and is not erased.
+
+### Step 1 — Generate QR codes and factory partitions
+
+From the repo root, generate 50 devices (change the count as needed):
+
+```bash
+./scripts/generate_orbix_qr.sh 50
+```
+
+This runs `esp-matter-mfg-tool` and reorganizes output into numbered folders:
+
+```
+mfg_qr_codes/fff2_8001/
+├── 1/<uuid>/<uuid>-qrcode.png
+├── 1/<uuid>/<uuid>-partition.bin
+├── 2/<uuid>/...
+...
+└── 50/<uuid>/...
+```
+
+Print QR labels from `*-qrcode.png` (one per device number).
+
+To reorganize manually after a standalone `esp-matter-mfg-tool` run:
+
+```bash
+python3 scripts/reorganize_mfg_output.py
+```
+
+### Step 2 — Flash factory data per device
+
+Flash device **#5** (port is auto-detected if only one USB serial adapter is connected):
+
+```bash
+python3 scripts/flash_factory_device.py 5
+```
+
+Or specify the port explicitly:
+
+```bash
+python3 scripts/flash_factory_device.py 5 -p /dev/ttyACM0
+```
+
+Preview without writing:
+
+```bash
+python3 scripts/flash_factory_device.py 5 --dry-run
+```
+
+The script reads `orbix-6-plug-hub/sdkconfig` and `partitions.csv` for VID/PID and flash offset. It flashes `mfg_qr_codes/fff2_8001/<N>/*/*-partition.bin` to **`fctry` @ `0x3E0000`**.
+
+Equivalent manual command:
+
+```bash
+esptool.py -p /dev/ttyACM0 write_flash 0x3E0000 \
+  mfg_qr_codes/fff2_8001/5/*/*-partition.bin
+```
+### Step 3 — Build and flash firmware
+
+```bash
+cd orbix-6-plug-hub
+source $IDF_PATH/export.sh
+idf.py build flash monitor
+```
+
+Flash the application firmware once per batch before programming per-device factory data.
+
+### Manufacturing line workflow
+
+1. Flash application firmware (`idf.py flash`) on each board.
+2. Run `flash_factory_device.py <N>` — **N** must match the QR label you attach.
+3. Attach printed QR label **#N** from `mfg_qr_codes/fff2_8001/N/`.
+4. Ship; customer commissions with that QR code.
+
+Re-flashing factory data on a commissioned device changes credentials — the customer must pair again with the new QR code. Plug state is not affected (different partition).
+
+## Plugin manager configuration
+
+Three default on-off plugin units are shown in the upstream example; this project uses **6 plugs**. To change GPIO assignments:
+
+1. `cd orbix-6-plug-hub && idf.py menuconfig`
+2. Open **Plugin manager**
+3. Update plug GPIO pins (use only pins available on your chip)
+
+## Device performance
 
 |                         | Bootup | After Commissioning |
-|:-                       |:-:     |:-:                  |
-|**Free Internal Memory** | 212KB   |127KB                |
+|:------------------------|:------:|:-------------------:|
+| **Free Internal Memory**| 212KB  | 127KB               |
 
-**Flash Usage**: Firmware binary size: 1.40MB
-
-This should give you a good idea about the amount of free memory that is
-available for you to run your application's code.
-
-Applications that do not require BLE post commissioning, can disable it using app_ble_disable() once commissioning is complete.
+**Flash usage:** firmware binary ~1.40MB (reference build on esp32c3_devkit_m).
