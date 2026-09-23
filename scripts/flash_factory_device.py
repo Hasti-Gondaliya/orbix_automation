@@ -13,6 +13,7 @@ Examples:
   python3 scripts/flash_factory_device.py 5
   python3 scripts/flash_factory_device.py 5 -p /dev/ttyACM0
   python3 scripts/flash_factory_device.py 5 --dry-run
+  python3 scripts/flash_factory_device.py 5 --erase-flash
 """
 
 from __future__ import annotations
@@ -301,6 +302,26 @@ def validate_partition_bin(partition_bin: str, partition: PartitionInfo) -> str 
     return None
 
 
+def erase_flash(port: str, baud: int, dry_run: bool) -> None:
+    esptool = _find_esptool()
+    cmd = [
+        esptool,
+        "-p",
+        port,
+        "-b",
+        str(baud),
+        "erase_flash",
+    ]
+
+    print("Command:")
+    print("  " + " ".join(cmd))
+    if dry_run:
+        print("(dry-run: not erasing flash)")
+        return
+
+    subprocess.run(cmd, check=True)
+
+
 def flash_partition(
     port: str,
     offset: int,
@@ -372,6 +393,11 @@ def main() -> int:
         help="Override flash offset (default: from partitions.csv)",
     )
     parser.add_argument("--baud", type=int, default=460800)
+    parser.add_argument(
+        "--erase-flash",
+        action="store_true",
+        help="Erase entire flash before writing factory partition (fresh board)",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "--force",
@@ -434,6 +460,10 @@ def main() -> int:
     print()
 
     try:
+        if args.erase_flash:
+            erase_flash(port, args.baud, args.dry_run)
+            if not args.dry_run:
+                print()
         flash_partition(port, offset, partition_bin, args.baud, args.dry_run)
     except subprocess.CalledProcessError as exc:
         print(f"ERROR: esptool failed (exit {exc.returncode})", file=sys.stderr)

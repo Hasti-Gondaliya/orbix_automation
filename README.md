@@ -8,18 +8,18 @@ Firmware lives in `orbix-6-plug-hub/`. See the [ESP-Matter docs](https://docs.es
 
 | Function | GPIO |
 |----------|------|
-| Plug 1 (relay) | 21 |
-| Plug 2 (relay) | 19 |
+| Plug 1 (relay) | 19 |
+| Plug 2 (relay) | 21 |
 | Plug 3 (relay) | 18 |
 | Plug 4 (relay) | 17 |
 | Plug 5 (relay) | 16 |
 | Plug 6 (relay) | 4 |
-| Switch 1 (momentary) | 32 |
-| Switch 2 (momentary) | 33 |
-| Switch 3 (momentary) | 25 |
-| Switch 4 (momentary) | 26 |
-| Switch 5 (momentary) | 27 |
-| Switch 6 (momentary) | 14 |
+| Switch 1 (momentary) | 14 |
+| Switch 2 (momentary) | 27 |
+| Switch 3 (momentary) | 26 |
+| Switch 4 (momentary) | 25 |
+| Switch 5 (momentary) | 33 |
+| Switch 6 (momentary) | 32 |
 | Factory reset button | 34 |
 
 Update pins via `idf.py menuconfig` → **Plugin manager**.
