@@ -1,0 +1,19 @@
+key,type,encoding,value
+chip-factory,namespace,,
+discriminator,data,u32,365
+iteration-count,data,u32,10000
+salt,data,string,TcVakY3ne+sT0bZvtJpSxyBXlBlYNDiZ/Q5EWYVNLQ8=
+vendor-id,data,u32,65522
+vendor-name,data,string,Orbix
+product-id,data,u32,32769
+product-name,data,string,6-Plug Controller
+hardware-ver,data,u32,1
+hw-ver-str,data,string,v1.0
+mfg-date,data,string,20260702
+serial-num,data,string,06af44a363ae45f71e487fd2204ece21
+dac-cert,file,binary,/home/haki/Documents/product/orbix_automation/mfg_qr_codes/fff2_8001/e96b24cf-b20e-4fff-b550-6e90001b57de/internal/DAC_cert.der
+dac-key,file,binary,/home/haki/Documents/product/orbix_automation/mfg_qr_codes/fff2_8001/e96b24cf-b20e-4fff-b550-6e90001b57de/internal/DAC_private_key.bin
+dac-pub-key,file,binary,/home/haki/Documents/product/orbix_automation/mfg_qr_codes/fff2_8001/e96b24cf-b20e-4fff-b550-6e90001b57de/internal/DAC_public_key.bin
+pai-cert,file,binary,/home/haki/Documents/product/orbix_automation/mfg_qr_codes/fff2_8001/staging/pai_cert.der
+verifier,data,string,awW/KamNo9JI2rRxbeQVNbzhBEBCQOU1HnUY0Icfw1sE++4hfJgC6wMNnwRmy5APPEusFCLX06Z+0nd6+CfIrHBhFWadNz0b8g6jGUV64FConXkycZX4eP5FmkGJxgw81w==
+cert-dclrn,file,binary,../esp-matter/connectedhomeip/connectedhomeip/credentials/test/certification-declaration/Chip-Test-CD-FFF2-8001.der
