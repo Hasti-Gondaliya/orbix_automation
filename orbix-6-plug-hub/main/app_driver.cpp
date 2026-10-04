@@ -173,6 +173,12 @@ static esp_err_t app_driver_set_plug_state(int plug_index, bool on)
     return ESP_OK;
 }
 
+/* GPIO 33 and GPIO 32 are the two-way pair. They drive plug 5. */
+static constexpr int TWO_WAY_PLUG_INDEX = 4;
+static gpio_num_t s_two_way_gpio[2] = {GPIO_NUM_NC, GPIO_NUM_NC};
+static int s_two_way_count = 0;
+static bool s_two_way_ready = false;
+
 static void app_driver_plug_button_press_down_cb(void *arg, void *data)
 {
     app_driver_set_plug_state((int)(intptr_t)data, true);
@@ -183,7 +189,32 @@ static void app_driver_plug_button_press_up_cb(void *arg, void *data)
     app_driver_set_plug_state((int)(intptr_t)data, false);
 }
 
-static esp_err_t app_driver_create_plug_button(gpio_num_t gpio, int plug_index)
+static bool app_driver_switch_is_closed(gpio_num_t gpio)
+{
+    return gpio_get_level(gpio) == CONFIG_PLUG_BUTTON_LEVEL;
+}
+
+static void app_driver_apply_two_way_state(void)
+{
+    if (!s_two_way_ready || s_two_way_count < 2 || TWO_WAY_PLUG_INDEX >= configure_plugs) {
+        return;
+    }
+
+    bool first_closed = app_driver_switch_is_closed(s_two_way_gpio[0]);
+    bool second_closed = app_driver_switch_is_closed(s_two_way_gpio[1]);
+    bool on = first_closed != second_closed;
+
+    ESP_LOGI(TAG, "Two-way GPIO %d=%d GPIO %d=%d -> plug %d %s", s_two_way_gpio[0], first_closed,
+             s_two_way_gpio[1], second_closed, TWO_WAY_PLUG_INDEX + 1, on ? "ON" : "OFF");
+    app_driver_set_plug_state(TWO_WAY_PLUG_INDEX, on);
+}
+
+static void app_driver_two_way_changed_cb(void *arg, void *data)
+{
+    app_driver_apply_two_way_state();
+}
+
+static esp_err_t app_driver_create_button(gpio_num_t gpio, button_cb_t down_cb, button_cb_t up_cb, void *usr_data)
 {
     if (gpio_conflicts_with_plugs(gpio)) {
         ESP_LOGE(TAG, "Plug button GPIO %d conflicts with a plug output", gpio);
@@ -210,17 +241,44 @@ static esp_err_t app_driver_create_plug_button(gpio_num_t gpio, int plug_index)
         return ESP_FAIL;
     }
 
-    err = iot_button_register_cb(handle, BUTTON_PRESS_DOWN, NULL, app_driver_plug_button_press_down_cb,
-                                 (void *)(intptr_t)plug_index);
-    err |= iot_button_register_cb(handle, BUTTON_PRESS_UP, NULL, app_driver_plug_button_press_up_cb,
-                                  (void *)(intptr_t)plug_index);
+    err = iot_button_register_cb(handle, BUTTON_PRESS_DOWN, NULL, down_cb, usr_data);
+    err |= iot_button_register_cb(handle, BUTTON_PRESS_UP, NULL, up_cb, usr_data);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to register plug button callbacks for GPIO %d", gpio);
         iot_button_delete(handle);
         return err;
     }
 
-    ESP_LOGI(TAG, "Plug %d button initialized on GPIO %d", plug_index + 1, gpio);
+    return ESP_OK;
+}
+
+static esp_err_t app_driver_create_plug_button(gpio_num_t gpio, int plug_index)
+{
+    esp_err_t err = app_driver_create_button(gpio, app_driver_plug_button_press_down_cb,
+                                             app_driver_plug_button_press_up_cb, (void *)(intptr_t)plug_index);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    ESP_LOGI(TAG, "Plug %d single-way switch initialized on GPIO %d", plug_index + 1, gpio);
+    return ESP_OK;
+}
+
+static esp_err_t app_driver_create_two_way_switch(gpio_num_t gpio)
+{
+    if (s_two_way_count >= 2) {
+        ESP_LOGE(TAG, "Two-way pair already has two switches");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    esp_err_t err = app_driver_create_button(gpio, app_driver_two_way_changed_cb, app_driver_two_way_changed_cb,
+                                             NULL);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    s_two_way_gpio[s_two_way_count++] = gpio;
+    ESP_LOGI(TAG, "Two-way switch for plug %d initialized on GPIO %d", TWO_WAY_PLUG_INDEX + 1, gpio);
     return ESP_OK;
 }
 
@@ -243,11 +301,16 @@ esp_err_t app_driver_plug_buttons_init(void)
 #ifdef CONFIG_GPIO_PLUG_BUTTON_4
     err |= CREATE_PLUG_BUTTON(4);
 #endif
-#ifdef CONFIG_GPIO_PLUG_BUTTON_5
-    err |= CREATE_PLUG_BUTTON(5);
-#endif
-#ifdef CONFIG_GPIO_PLUG_BUTTON_6
-    err |= CREATE_PLUG_BUTTON(6);
+#if defined(CONFIG_GPIO_PLUG_BUTTON_5) && defined(CONFIG_GPIO_PLUG_BUTTON_6)
+    esp_err_t two_way_a = app_driver_create_two_way_switch((gpio_num_t)CONFIG_GPIO_PLUG_BUTTON_5);
+    esp_err_t two_way_b = app_driver_create_two_way_switch((gpio_num_t)CONFIG_GPIO_PLUG_BUTTON_6);
+    err |= two_way_a;
+    err |= two_way_b;
+    if (two_way_a == ESP_OK && two_way_b == ESP_OK) {
+        s_two_way_ready = true;
+        ESP_LOGI(TAG, "Plug 6 has no local switch");
+        app_driver_apply_two_way_state();
+    }
 #endif
 #ifdef CONFIG_GPIO_PLUG_BUTTON_7
     err |= CREATE_PLUG_BUTTON(7);

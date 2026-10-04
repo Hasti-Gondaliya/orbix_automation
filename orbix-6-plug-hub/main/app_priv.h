@@ -74,8 +74,9 @@ app_driver_handle_t app_driver_button_init(gpio_num_t * reset_gpio);
 
 /** Initialize plug control buttons
  *
- * Creates one GPIO button per configured plug. Press turns the plug on,
- * release turns it off.
+ * Switches 1-4 are single-way: closed turns that plug on, open turns it off.
+ * Switches on GPIO 33 and GPIO 32 are a two-way pair for plug 5: the relay is
+ * on when the two switch positions differ. Plug 6 has no local switch.
  *
  * @return ESP_OK on success.
  * @return error in case of failure.

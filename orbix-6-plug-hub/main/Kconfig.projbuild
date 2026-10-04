@@ -34,7 +34,7 @@ menu "Plugin manager"
 
     config GPIO_PLUG_1
         int "GPIO pin number for plug 1"
-        default 21 if IDF_TARGET_ESP32
+        default 19 if IDF_TARGET_ESP32
         default 2
         depends on (NUM_VIRTUAL_PLUGS >= 1)
         help
@@ -42,7 +42,7 @@ menu "Plugin manager"
 
     config GPIO_PLUG_2
         int "GPIO pin number for plug 2"
-        default 19 if IDF_TARGET_ESP32
+        default 21 if IDF_TARGET_ESP32
         default 4
         depends on (NUM_VIRTUAL_PLUGS >= 2)
         help
@@ -189,50 +189,52 @@ menu "Plugin manager"
             Set GPIO pin value for target chip to create plugin unit
 
     config GPIO_PLUG_BUTTON_1
-        int "GPIO pin for plug 1 control button"
-        default 32 if IDF_TARGET_ESP32
+        int "GPIO pin for plug 1 single-way switch"
+        default 14 if IDF_TARGET_ESP32
         default 15
         depends on (NUM_VIRTUAL_PLUGS >= 1)
         help
-            Physical switch that turns plug 1 on while pressed.
+            Single-way switch. Closed turns plug 1 on, open turns it off.
 
     config GPIO_PLUG_BUTTON_2
-        int "GPIO pin for plug 2 control button"
-        default 33 if IDF_TARGET_ESP32
+        int "GPIO pin for plug 2 single-way switch"
+        default 27 if IDF_TARGET_ESP32
         default 16
         depends on (NUM_VIRTUAL_PLUGS >= 2)
         help
-            Physical switch that turns plug 2 on while pressed.
+            Single-way switch. Closed turns plug 2 on, open turns it off.
 
     config GPIO_PLUG_BUTTON_3
-        int "GPIO pin for plug 3 control button"
-        default 25 if IDF_TARGET_ESP32
+        int "GPIO pin for plug 3 single-way switch"
+        default 26 if IDF_TARGET_ESP32
         default 17
         depends on (NUM_VIRTUAL_PLUGS >= 3)
         help
-            Physical switch that turns plug 3 on while pressed.
+            Single-way switch. Closed turns plug 3 on, open turns it off.
 
     config GPIO_PLUG_BUTTON_4
-        int "GPIO pin for plug 4 control button"
-        default 26 if IDF_TARGET_ESP32
+        int "GPIO pin for plug 4 single-way switch"
+        default 25 if IDF_TARGET_ESP32
         default 18
         depends on (NUM_VIRTUAL_PLUGS >= 4)
         help
-            Physical switch that turns plug 4 on while pressed.
+            Single-way switch. Closed turns plug 4 on, open turns it off.
 
     config GPIO_PLUG_BUTTON_5
-        int "GPIO pin for plug 5 control button"
-        default 27 if IDF_TARGET_ESP32
+        int "GPIO pin for two-way switch A (plug 5)"
+        default 33 if IDF_TARGET_ESP32
         default 19
         depends on (NUM_VIRTUAL_PLUGS >= 5)
         help
-            Physical switch that turns plug 5 on while pressed.
+            First switch of the two-way pair that controls plug 5, together
+            with GPIO_PLUG_BUTTON_6. Plug 5 is on when the two positions differ.
 
     config GPIO_PLUG_BUTTON_6
-        int "GPIO pin for plug 6 control button"
-        default 14 if IDF_TARGET_ESP32
+        int "GPIO pin for two-way switch B (plug 5)"
+        default 32 if IDF_TARGET_ESP32
         default 21
         depends on (NUM_VIRTUAL_PLUGS >= 6)
         help
-            Physical switch that turns plug 6 on while pressed.
+            Second switch of the two-way pair that controls plug 5.
+            This pin does not control plug 6. Plug 6 has no local switch.
 endmenu
