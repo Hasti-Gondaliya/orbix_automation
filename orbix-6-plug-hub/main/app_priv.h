@@ -74,14 +74,18 @@ app_driver_handle_t app_driver_button_init(gpio_num_t * reset_gpio);
 
 /** Initialize plug control buttons
  *
- * Switches 1-4 are single-way: closed turns that plug on, open turns it off.
- * Switches on GPIO 33 and GPIO 32 are a two-way pair for plug 5: the relay is
- * on when the two switch positions differ. Plug 6 has no local switch.
+ * Switches 1 and 2 are single-way for plugs 1 and 2. Switches 3 and 4 are a
+ * two-way pair for plug 3. GPIO 33 and GPIO 32 are a two-way pair for plug 4.
+ * Each two-way relay is on when its two switch positions differ. Relays on
+ * GPIO 16 and GPIO 4 are held off.
  *
  * @return ESP_OK on success.
  * @return error in case of failure.
  */
 esp_err_t app_driver_plug_buttons_init(void);
+
+/** Drive the two unused relay outputs off and keep them there. */
+void app_driver_hold_unused_relays_off(void);
 
 /** Restore plug on/off states from Matter NVS and drive relay GPIOs.
  *

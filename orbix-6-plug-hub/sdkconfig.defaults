@@ -40,14 +40,13 @@ CONFIG_LWIP_IPV6_NUM_ADDRESSES=6
 # disable groupcast cluster until verified
 CONFIG_SUPPORT_GROUPCAST_CLUSTER=n
 
-# Plugin manager: 6 plugs + switches (Orbix ESP32 pinout)
-CONFIG_NUM_VIRTUAL_PLUGS=6
+# Plugin manager: 4 relays in use (Orbix ESP32 pinout)
+# Relays on GPIO 16 and GPIO 4 are held off and are not Matter endpoints.
+CONFIG_NUM_VIRTUAL_PLUGS=4
 CONFIG_GPIO_PLUG_1=19
 CONFIG_GPIO_PLUG_2=21
 CONFIG_GPIO_PLUG_3=18
 CONFIG_GPIO_PLUG_4=17
-CONFIG_GPIO_PLUG_5=16
-CONFIG_GPIO_PLUG_6=4
 
 # Factory reset button
 CONFIG_USER_BUTTON=y
@@ -55,9 +54,9 @@ CONFIG_USER_BUTTON_GPIO=34
 CONFIG_USER_BUTTON_LEVEL=0
 
 # Plug control switches (active level 0 = switch closed)
-# GPIO 14, 27, 26, 25: single-way for plugs 1-4 (closed = on)
-# GPIO 33 + GPIO 32: two-way pair for plug 5 (on when the two positions differ)
-# Plug 6 has no local switch
+# GPIO 14, 27: single-way for plugs 1 and 2 (closed = on)
+# GPIO 26 + GPIO 25: two-way pair for plug 3 (on when the two positions differ)
+# GPIO 33 + GPIO 32: two-way pair for plug 4 (on when the two positions differ)
 CONFIG_PLUG_BUTTON_LEVEL=0
 CONFIG_GPIO_PLUG_BUTTON_1=14
 CONFIG_GPIO_PLUG_BUTTON_2=27

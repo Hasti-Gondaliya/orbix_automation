@@ -1,6 +1,6 @@
 # Orbix 6-Plug Hub
 
-ESP32 Matter firmware for a 6-outlet plug controller with four single-way switches, one two-way pair, and per-device factory QR commissioning.
+ESP32 Matter firmware for a 4-relay plug controller with two single-way switches, two two-way pairs, and per-device factory QR commissioning.
 
 Firmware lives in `orbix-6-plug-hub/`. See the [ESP-Matter docs](https://docs.espressif.com/projects/esp-matter/en/latest/esp32/developing.html) for general build and flash instructions.
 
@@ -12,17 +12,17 @@ Firmware lives in `orbix-6-plug-hub/`. See the [ESP-Matter docs](https://docs.es
 | Plug 2 (relay) | 21 |
 | Plug 3 (relay) | 18 |
 | Plug 4 (relay) | 17 |
-| Plug 5 (relay) | 16 |
-| Plug 6 (relay) | 4 |
+| Unused relay (held off) | 16 |
+| Unused relay (held off) | 4 |
 | Switch 1 (single-way, plug 1) | 14 |
 | Switch 2 (single-way, plug 2) | 27 |
-| Switch 3 (single-way, plug 3) | 26 |
-| Switch 4 (single-way, plug 4) | 25 |
-| Switch 5 (two-way, plug 5) | 33 |
-| Switch 6 (two-way, plug 5) | 32 |
+| Switch 3 (two-way, plug 3) | 26 |
+| Switch 4 (two-way, plug 3) | 25 |
+| Switch 5 (two-way, plug 4) | 33 |
+| Switch 6 (two-way, plug 4) | 32 |
 | Factory reset button | 34 |
 
-Switches 1–4 are single-way: closed turns that relay on, open turns it off. Switches 5 and 6 (GPIO 33 and 32) are a two-way pair for plug 5: the relay is on when the two switch positions differ. Plug 6 stays in the app and has no wall switch.
+Switches 1 and 2 are single-way: closed turns that relay on, open turns it off. Switches 3 and 4 are a two-way pair for plug 3. Switches 5 and 6 (GPIO 33 and 32) are a two-way pair for plug 4. A two-way relay is on when its two switch positions differ. Relays on GPIO 16 and GPIO 4 stay off and are not exposed in Matter.
 
 Update pins via `idf.py menuconfig` → **Plugin manager**.
 

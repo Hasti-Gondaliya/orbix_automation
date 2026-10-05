@@ -205,36 +205,36 @@ menu "Plugin manager"
             Single-way switch. Closed turns plug 2 on, open turns it off.
 
     config GPIO_PLUG_BUTTON_3
-        int "GPIO pin for plug 3 single-way switch"
+        int "GPIO pin for two-way switch A (plug 3)"
         default 26 if IDF_TARGET_ESP32
         default 17
         depends on (NUM_VIRTUAL_PLUGS >= 3)
         help
-            Single-way switch. Closed turns plug 3 on, open turns it off.
+            First switch of the two-way pair that controls plug 3, together
+            with GPIO_PLUG_BUTTON_4. Plug 3 is on when the two positions differ.
 
     config GPIO_PLUG_BUTTON_4
-        int "GPIO pin for plug 4 single-way switch"
+        int "GPIO pin for two-way switch B (plug 3)"
         default 25 if IDF_TARGET_ESP32
         default 18
         depends on (NUM_VIRTUAL_PLUGS >= 4)
         help
-            Single-way switch. Closed turns plug 4 on, open turns it off.
+            Second switch of the two-way pair that controls plug 3.
 
     config GPIO_PLUG_BUTTON_5
-        int "GPIO pin for two-way switch A (plug 5)"
+        int "GPIO pin for two-way switch A (plug 4)"
         default 33 if IDF_TARGET_ESP32
         default 19
-        depends on (NUM_VIRTUAL_PLUGS >= 5)
+        depends on (NUM_VIRTUAL_PLUGS >= 4)
         help
-            First switch of the two-way pair that controls plug 5, together
-            with GPIO_PLUG_BUTTON_6. Plug 5 is on when the two positions differ.
+            First switch of the two-way pair that controls plug 4, together
+            with GPIO_PLUG_BUTTON_6. Plug 4 is on when the two positions differ.
 
     config GPIO_PLUG_BUTTON_6
-        int "GPIO pin for two-way switch B (plug 5)"
+        int "GPIO pin for two-way switch B (plug 4)"
         default 32 if IDF_TARGET_ESP32
         default 21
-        depends on (NUM_VIRTUAL_PLUGS >= 6)
+        depends on (NUM_VIRTUAL_PLUGS >= 4)
         help
-            Second switch of the two-way pair that controls plug 5.
-            This pin does not control plug 6. Plug 6 has no local switch.
+            Second switch of the two-way pair that controls plug 4.
 endmenu

@@ -173,11 +173,25 @@ static esp_err_t app_driver_set_plug_state(int plug_index, bool on)
     return ESP_OK;
 }
 
-/* GPIO 33 and GPIO 32 are the two-way pair. They drive plug 5. */
-static constexpr int TWO_WAY_PLUG_INDEX = 4;
-static gpio_num_t s_two_way_gpio[2] = {GPIO_NUM_NC, GPIO_NUM_NC};
-static int s_two_way_count = 0;
-static bool s_two_way_ready = false;
+/* Two single-way switches and two two-way pairs, four relays.
+ * Pair 0: switches 3 and 4 -> plug 3. Pair 1: GPIO 33 and 32 -> plug 4.
+ */
+static constexpr int TWO_WAY_PAIR_COUNT = 2;
+
+struct two_way_pair {
+    int plug_index;
+    gpio_num_t gpio[2];
+    int count;
+    bool ready;
+};
+
+static two_way_pair s_two_way[TWO_WAY_PAIR_COUNT];
+
+/* Board relays that are not Matter endpoints. Held off so they cannot float. */
+static const gpio_num_t s_unused_relay_gpio[] = {
+    GPIO_NUM_16,
+    GPIO_NUM_4,
+};
 
 static void app_driver_plug_button_press_down_cb(void *arg, void *data)
 {
@@ -194,24 +208,29 @@ static bool app_driver_switch_is_closed(gpio_num_t gpio)
     return gpio_get_level(gpio) == CONFIG_PLUG_BUTTON_LEVEL;
 }
 
-static void app_driver_apply_two_way_state(void)
+static void app_driver_apply_two_way_state(int pair_index)
 {
-    if (!s_two_way_ready || s_two_way_count < 2 || TWO_WAY_PLUG_INDEX >= configure_plugs) {
+    if (pair_index < 0 || pair_index >= TWO_WAY_PAIR_COUNT) {
         return;
     }
 
-    bool first_closed = app_driver_switch_is_closed(s_two_way_gpio[0]);
-    bool second_closed = app_driver_switch_is_closed(s_two_way_gpio[1]);
+    two_way_pair *pair = &s_two_way[pair_index];
+    if (!pair->ready || pair->count < 2 || pair->plug_index < 0 || pair->plug_index >= configure_plugs) {
+        return;
+    }
+
+    bool first_closed = app_driver_switch_is_closed(pair->gpio[0]);
+    bool second_closed = app_driver_switch_is_closed(pair->gpio[1]);
     bool on = first_closed != second_closed;
 
-    ESP_LOGI(TAG, "Two-way GPIO %d=%d GPIO %d=%d -> plug %d %s", s_two_way_gpio[0], first_closed,
-             s_two_way_gpio[1], second_closed, TWO_WAY_PLUG_INDEX + 1, on ? "ON" : "OFF");
-    app_driver_set_plug_state(TWO_WAY_PLUG_INDEX, on);
+    ESP_LOGI(TAG, "Two-way GPIO %d=%d GPIO %d=%d -> plug %d %s", pair->gpio[0], first_closed, pair->gpio[1],
+             second_closed, pair->plug_index + 1, on ? "ON" : "OFF");
+    app_driver_set_plug_state(pair->plug_index, on);
 }
 
 static void app_driver_two_way_changed_cb(void *arg, void *data)
 {
-    app_driver_apply_two_way_state();
+    app_driver_apply_two_way_state((int)(intptr_t)data);
 }
 
 static esp_err_t app_driver_create_button(gpio_num_t gpio, button_cb_t down_cb, button_cb_t up_cb, void *usr_data)
@@ -264,22 +283,55 @@ static esp_err_t app_driver_create_plug_button(gpio_num_t gpio, int plug_index)
     return ESP_OK;
 }
 
-static esp_err_t app_driver_create_two_way_switch(gpio_num_t gpio)
+static esp_err_t app_driver_create_two_way_switch(int pair_index, gpio_num_t gpio)
 {
-    if (s_two_way_count >= 2) {
-        ESP_LOGE(TAG, "Two-way pair already has two switches");
+    if (pair_index < 0 || pair_index >= TWO_WAY_PAIR_COUNT) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    two_way_pair *pair = &s_two_way[pair_index];
+    if (pair->count >= 2) {
+        ESP_LOGE(TAG, "Two-way pair %d already has two switches", pair_index + 1);
         return ESP_ERR_INVALID_STATE;
     }
 
     esp_err_t err = app_driver_create_button(gpio, app_driver_two_way_changed_cb, app_driver_two_way_changed_cb,
-                                             NULL);
+                                             (void *)(intptr_t)pair_index);
     if (err != ESP_OK) {
         return err;
     }
 
-    s_two_way_gpio[s_two_way_count++] = gpio;
-    ESP_LOGI(TAG, "Two-way switch for plug %d initialized on GPIO %d", TWO_WAY_PLUG_INDEX + 1, gpio);
+    pair->gpio[pair->count++] = gpio;
+    ESP_LOGI(TAG, "Two-way switch for plug %d initialized on GPIO %d", pair->plug_index + 1, gpio);
     return ESP_OK;
+}
+
+static esp_err_t app_driver_init_two_way_pair(int pair_index, int plug_index, gpio_num_t gpio_a, gpio_num_t gpio_b)
+{
+    s_two_way[pair_index].plug_index = plug_index;
+    s_two_way[pair_index].count = 0;
+    s_two_way[pair_index].ready = false;
+
+    esp_err_t err_a = app_driver_create_two_way_switch(pair_index, gpio_a);
+    esp_err_t err_b = app_driver_create_two_way_switch(pair_index, gpio_b);
+    if (err_a == ESP_OK && err_b == ESP_OK) {
+        s_two_way[pair_index].ready = true;
+        app_driver_apply_two_way_state(pair_index);
+        return ESP_OK;
+    }
+
+    return err_a != ESP_OK ? err_a : err_b;
+}
+
+void app_driver_hold_unused_relays_off(void)
+{
+    for (size_t i = 0; i < sizeof(s_unused_relay_gpio) / sizeof(s_unused_relay_gpio[0]); i++) {
+        gpio_num_t pin = s_unused_relay_gpio[i];
+        gpio_reset_pin(pin);
+        gpio_set_direction(pin, GPIO_MODE_OUTPUT);
+        gpio_set_level(pin, 0);
+        ESP_LOGI(TAG, "Unused relay GPIO %d held off", pin);
+    }
 }
 
 #define CREATE_PLUG_BUTTON(plug_id) \
@@ -295,22 +347,13 @@ esp_err_t app_driver_plug_buttons_init(void)
 #ifdef CONFIG_GPIO_PLUG_BUTTON_2
     err |= CREATE_PLUG_BUTTON(2);
 #endif
-#ifdef CONFIG_GPIO_PLUG_BUTTON_3
-    err |= CREATE_PLUG_BUTTON(3);
-#endif
-#ifdef CONFIG_GPIO_PLUG_BUTTON_4
-    err |= CREATE_PLUG_BUTTON(4);
+#if defined(CONFIG_GPIO_PLUG_BUTTON_3) && defined(CONFIG_GPIO_PLUG_BUTTON_4)
+    err |= app_driver_init_two_way_pair(0, 2, (gpio_num_t)CONFIG_GPIO_PLUG_BUTTON_3,
+                                        (gpio_num_t)CONFIG_GPIO_PLUG_BUTTON_4);
 #endif
 #if defined(CONFIG_GPIO_PLUG_BUTTON_5) && defined(CONFIG_GPIO_PLUG_BUTTON_6)
-    esp_err_t two_way_a = app_driver_create_two_way_switch((gpio_num_t)CONFIG_GPIO_PLUG_BUTTON_5);
-    esp_err_t two_way_b = app_driver_create_two_way_switch((gpio_num_t)CONFIG_GPIO_PLUG_BUTTON_6);
-    err |= two_way_a;
-    err |= two_way_b;
-    if (two_way_a == ESP_OK && two_way_b == ESP_OK) {
-        s_two_way_ready = true;
-        ESP_LOGI(TAG, "Plug 6 has no local switch");
-        app_driver_apply_two_way_state();
-    }
+    err |= app_driver_init_two_way_pair(1, 3, (gpio_num_t)CONFIG_GPIO_PLUG_BUTTON_5,
+                                        (gpio_num_t)CONFIG_GPIO_PLUG_BUTTON_6);
 #endif
 #ifdef CONFIG_GPIO_PLUG_BUTTON_7
     err |= CREATE_PLUG_BUTTON(7);

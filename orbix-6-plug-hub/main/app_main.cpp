@@ -224,6 +224,8 @@ extern "C" void app_main()
     node_t *node = node::create(&node_config, app_attribute_update_cb, app_identification_cb);
     ABORT_APP_ON_FAILURE(node != nullptr, ESP_LOGE(TAG, "Failed to create Matter node"));
 
+    app_driver_hold_unused_relays_off();
+
 #ifdef CONFIG_GPIO_PLUG_1
     CREATE_PLUG(node, 1)
 #endif
